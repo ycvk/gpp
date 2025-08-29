@@ -3,11 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/danbai225/gpp/server/core"
-	"github.com/google/uuid"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/danbai225/gpp/server/core"
+	"github.com/google/uuid"
 )
 
 func main() {

@@ -2,18 +2,14 @@ package config
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/sagernet/sing-box/option"
-	"io"
-	"net/http"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
+
+	"github.com/sagernet/sing-box/option"
 )
 
 var Debug atomic.Bool
@@ -47,86 +43,24 @@ type Config struct {
 	Debug    bool          `json:"debug"`
 }
 
+// InitConfig 初始化配置文件（使用新的配置加载器）
 func InitConfig() {
-	home, _ := os.UserHomeDir()
-	_path := "config.json"
-	_, err := os.Stat(_path)
-	if err != nil {
-		_path = fmt.Sprintf("%s%c%s%c%s", home, os.PathSeparator, ".gpp", os.PathSeparator, "config.json")
-	}
-	_ = os.MkdirAll(filepath.Dir(_path), 0o755)
-	_, err = os.Stat(_path)
-	if err != nil {
-		file, _ := json.Marshal(Config{PeerList: make([]*Peer, 0)})
-		err = os.WriteFile(_path, file, 0o644)
+	loader := NewConfigLoader()
+	if err := loader.Init(); err != nil {
+		fmt.Printf("Error initializing config: %v\n", err)
 	}
 }
+
+// LoadConfig 加载配置（使用新的配置加载器）
 func LoadConfig() (*Config, error) {
-	home, _ := os.UserHomeDir()
-	_path := "config.json"
-	_, err := os.Stat(_path)
-	if err != nil {
-		_path = fmt.Sprintf("%s%c%s%c%s", home, os.PathSeparator, ".gpp", os.PathSeparator, "config.json")
-	}
-	file, _ := os.ReadFile(_path)
-	conf := &Config{PeerList: make([]*Peer, 0)}
-	err = json.Unmarshal(file, &conf)
-	var direct bool
-	for _, peer := range conf.PeerList {
-		if peer.Name == "直连" {
-			direct = true
-		}
-	}
-	if !direct {
-		conf.PeerList = append(conf.PeerList, &Peer{Name: "直连", Protocol: "direct", Port: 0, Addr: "127.0.0.1", UUID: "", Ping: 0})
-	}
-	if conf.ProxyDNS == "" {
-		conf.ProxyDNS = "https://1.1.1.1/dns-query"
-	}
-	if conf.LocalDNS == "" {
-		conf.LocalDNS = "https://223.5.5.5/dns-query"
-	}
-	if conf.SubAddr != "" {
-		var resp *http.Response
-		var data []byte
-		resp, err = http.Get(conf.SubAddr)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = resp.Body.Close() }()
-		data, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		peers := make([]*Peer, 0)
-		err = json.Unmarshal(data, &peers)
-		if err != nil {
-			return nil, err
-		}
-		set := make(map[string]*Peer)
-		conf.PeerList = append(conf.PeerList, peers...)
-		for _, peer := range conf.PeerList {
-			set[peer.Name] = peer
-		}
-		conf.PeerList = make([]*Peer, 0)
-		for _, peer := range set {
-			conf.PeerList = append(conf.PeerList, peer)
-		}
-	}
-	if conf.Debug {
-		Debug.Swap(true)
-	}
-	return conf, err
+	loader := NewConfigLoader()
+	return loader.Load()
 }
+
+// SaveConfig 保存配置（使用新的配置加载器）
 func SaveConfig(config *Config) error {
-	home, _ := os.UserHomeDir()
-	_path := "config.json"
-	_, err := os.Stat(_path)
-	if err != nil {
-		_path = fmt.Sprintf("%s%c%s%c%s", home, os.PathSeparator, ".gpp", os.PathSeparator, "config.json")
-	}
-	file, _ := json.MarshalIndent(config, "", " ")
-	return os.WriteFile(_path, file, 0o644)
+	loader := NewConfigLoader()
+	return loader.Save(config)
 }
 func ParsePeer(token string) (error, *Peer) {
 	split := strings.Split(token, "#")

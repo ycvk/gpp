@@ -3,14 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/cloverstd/tcping/ping"
-	"github.com/danbai225/gpp/backend/client"
-	"github.com/danbai225/gpp/backend/config"
-	"github.com/danbai225/gpp/backend/data"
-	"github.com/danbai225/gpp/systray"
-	box "github.com/sagernet/sing-box"
-	netutils "github.com/shirou/gopsutil/v3/net"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"io"
 	"net"
 	"net/http"
@@ -19,6 +11,16 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/cloverstd/tcping/ping"
+	"github.com/danbai225/gpp/backend/client"
+	"github.com/danbai225/gpp/backend/config"
+	"github.com/danbai225/gpp/backend/data"
+	"github.com/danbai225/gpp/backend/errors"
+	"github.com/danbai225/gpp/systray"
+	box "github.com/sagernet/sing-box"
+	netutils "github.com/shirou/gopsutil/v3/net"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -96,9 +98,36 @@ func (a *App) systemTray() {
 }
 
 func (a *App) testPing() {
+	initialDelay := time.Second * 5 // 初始延迟5秒
+	normalDelay := time.Second * 30 // 正常延迟30秒
+	maxDelay := time.Minute * 2     // 最大延迟2分钟
+	currentDelay := initialDelay
+	consecutiveStable := 0 // 连续稳定次数
+
 	for {
 		a.PingAll()
-		time.Sleep(time.Second * 5)
+
+		// 根据网络稳定性调整测试频率
+		a.lock.Lock()
+		isRunning := a.box != nil
+		a.lock.Unlock()
+
+		if isRunning {
+			// 运行时减少测试频率
+			currentDelay = maxDelay
+		} else {
+			// 未运行时，根据稳定性调整
+			consecutiveStable++
+			if consecutiveStable > 10 {
+				// 稳定10次后使用正常延迟
+				currentDelay = normalDelay
+			} else if consecutiveStable > 20 {
+				// 非常稳定，使用最大延迟
+				currentDelay = maxDelay
+			}
+		}
+
+		time.Sleep(currentDelay)
 	}
 }
 func (a *App) startup(ctx context.Context) {
@@ -143,19 +172,44 @@ func (a *App) PingAll() {
 		return
 	}
 	a.lock.Unlock()
-	group := sync.WaitGroup{}
+
+	// 使用 worker pool 限制并发数
+	const maxWorkers = 5 // 最多同时 ping 5个节点
+
+	type pingJob struct {
+		peer *config.Peer
+	}
+
+	jobs := make(chan pingJob, len(a.conf.PeerList))
+	results := make(chan struct{}, len(a.conf.PeerList))
+
+	// 启动 worker pool
+	var wg sync.WaitGroup
+	for w := 0; w < maxWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				job.peer.Ping = pingPort(job.peer.Addr, job.peer.Port)
+				results <- struct{}{}
+			}
+		}()
+	}
+
+	// 发送任务到队列
+	jobCount := 0
 	for i := range a.conf.PeerList {
 		if a.conf.PeerList[i].Protocol == "direct" {
 			continue
 		}
-		group.Add(1)
-		peer := a.conf.PeerList[i]
-		go func() {
-			defer group.Done()
-			peer.Ping = pingPort(peer.Addr, peer.Port)
-		}()
+		jobs <- pingJob{peer: a.conf.PeerList[i]}
+		jobCount++
 	}
-	group.Wait()
+	close(jobs)
+
+	// 等待所有任务完成
+	wg.Wait()
+	close(results)
 }
 
 func (a *App) Status() *data.Status {
@@ -280,23 +334,46 @@ func (a *App) Start() string {
 	var err error
 	a.box, err = client.Client(a.gamePeer, a.httpPeer, a.conf.ProxyDNS, a.conf.LocalDNS, a.conf.Rules)
 	if err != nil {
+		// 根据错误类型提供更友好的提示
+		appErr := errors.NewNetworkError("创建代理客户端失败", err)
+
+		// 特殊处理常见错误
+		if strings.Contains(err.Error(), "permission") {
+			appErr = errors.NewPermissionError("权限不足", err).
+				WithUserMessage("需要管理员权限来创建网络接口").
+				WithSuggestion("请以管理员身份运行程序")
+		} else if strings.Contains(err.Error(), "address already in use") {
+			appErr = errors.NewNetworkError("端口已被占用", err).
+				WithUserMessage("代理端口已被其他程序占用").
+				WithSuggestion("请检查是否有其他VPN或代理程序正在运行")
+		}
+
 		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
 			Type:    runtime.ErrorDialog,
 			Title:   "加速失败",
-			Message: err.Error(),
+			Message: fmt.Sprintf("%s\n\n建议：%s", appErr.UserMessage, appErr.Suggestion),
 		})
 		a.box = nil
-		return err.Error()
+		return appErr.Error()
 	}
 	err = a.box.Start()
 	if err != nil {
+		appErr := errors.NewSystemError("启动代理服务失败", err)
+
+		// 检查特定错误类型
+		if strings.Contains(err.Error(), "TUN") {
+			appErr = errors.NewPermissionError("创建TUN接口失败", err).
+				WithUserMessage("无法创建虚拟网络接口").
+				WithSuggestion("请确保以管理员权限运行，并检查系统是否支持TUN设备")
+		}
+
 		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
 			Type:    runtime.ErrorDialog,
 			Title:   "加速失败",
-			Message: err.Error(),
+			Message: fmt.Sprintf("%s\n\n建议：%s", appErr.UserMessage, appErr.Suggestion),
 		})
 		a.box = nil
-		return err.Error()
+		return appErr.Error()
 	}
 	return "ok"
 }

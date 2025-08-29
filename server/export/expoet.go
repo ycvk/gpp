@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/danbai225/gpp/server/core"
 	"github.com/google/uuid"
-	"os"
 )
 
 func init() {
