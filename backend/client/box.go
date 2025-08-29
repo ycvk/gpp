@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
+	"os"
+	"time"
+
 	"github.com/danbai225/gpp/backend/config"
 	"github.com/google/uuid"
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/option"
 	dns "github.com/sagernet/sing-dns"
-	"net/netip"
-	"os"
-	"time"
+	"github.com/sagernet/sing/common/json/badoption"
 )
 
 func getOUt(peer *config.Peer) option.Outbound {
@@ -20,7 +22,7 @@ func getOUt(peer *config.Peer) option.Outbound {
 	case "shadowsocks":
 		out = option.Outbound{
 			Type: "shadowsocks",
-			ShadowsocksOptions: option.ShadowsocksOutboundOptions{
+			Options: &option.ShadowsocksOutboundOptions{
 				ServerOptions: option.ServerOptions{
 					Server:     peer.Addr,
 					ServerPort: peer.Port,
@@ -43,7 +45,7 @@ func getOUt(peer *config.Peer) option.Outbound {
 	case "socks":
 		out = option.Outbound{
 			Type: "socks",
-			SocksOptions: option.SocksOutboundOptions{
+			Options: &option.SOCKSOutboundOptions{
 				ServerOptions: option.ServerOptions{
 					Server:     peer.Addr,
 					ServerPort: peer.Port,
@@ -59,7 +61,7 @@ func getOUt(peer *config.Peer) option.Outbound {
 	case "hysteria2":
 		out = option.Outbound{
 			Type: "hysteria2",
-			Hysteria2Options: option.Hysteria2OutboundOptions{
+			Options: &option.Hysteria2OutboundOptions{
 				ServerOptions: option.ServerOptions{
 					Server:     peer.Addr,
 					ServerPort: peer.Port,
@@ -70,7 +72,7 @@ func getOUt(peer *config.Peer) option.Outbound {
 						Enabled:    true,
 						ServerName: "gpp",
 						Insecure:   true,
-						ALPN:       option.Listable[string]{"h3"},
+						ALPN:       []string{"h3"},
 					},
 				},
 				BrutalDebug: false,
@@ -83,7 +85,7 @@ func getOUt(peer *config.Peer) option.Outbound {
 	default:
 		out = option.Outbound{
 			Type: "vless",
-			VLESSOptions: option.VLESSOutboundOptions{
+			Options: &option.VLESSOutboundOptions{
 				ServerOptions: option.ServerOptions{
 					Server:     peer.Addr,
 					ServerPort: peer.Port,
@@ -118,68 +120,89 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 				Disabled: true,
 			},
 			DNS: &option.DNSOptions{
-				Servers: []option.DNSServerOptions{
-					{
-						Tag:      "proxyDns",
-						Address:  proxyDNS,
-						Detour:   "proxy",
-						Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
-					},
-					{
-						Tag:      "localDns",
-						Address:  localDNS,
-						Detour:   "direct",
-						Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
-					},
-					{
-						Tag:      "block",
-						Address:  "rcode://success",
-						Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
-					},
-				},
-				Rules: []option.DNSRule{
-					{
-						Type: "default",
-						DefaultOptions: option.DefaultDNSRule{
-							Server: "localDns",
-							Domain: []string{
-								gamePeer.Domain(),
-								httpPeer.Domain(),
+				RawDNSOptions: option.RawDNSOptions{
+					Servers: []option.DNSServerOptions{
+						{
+							Tag: "proxyDns",
+							Options: &option.LegacyDNSServerOptions{
+								Address:  proxyDNS,
+								Detour:   "proxy",
+								Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
+							},
+						},
+						{
+							Tag: "localDns",
+							Options: &option.LegacyDNSServerOptions{
+								Address:  localDNS,
+								Detour:   "direct",
+								Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
+							},
+						},
+						{
+							Tag: "block",
+							Options: &option.LegacyDNSServerOptions{
+								Address:  "rcode://success",
+								Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
 							},
 						},
 					},
-					{
-						Type: "default",
-						DefaultOptions: option.DefaultDNSRule{
-							Server: "localDns",
-							Geosite: []string{
-								"cn",
+					Rules: []option.DNSRule{
+						{
+							Type: "default",
+							DefaultOptions: option.DefaultDNSRule{
+								RawDefaultDNSRule: option.RawDefaultDNSRule{
+									Domain: badoption.Listable[string]{
+										gamePeer.Domain(),
+										httpPeer.Domain(),
+									},
+								},
+								DNSRuleAction: option.DNSRuleAction{
+									RouteOptions: option.DNSRouteActionOptions{
+										Server: "localDns",
+									},
+								},
+							},
+						},
+						{
+							Type: "default",
+							DefaultOptions: option.DefaultDNSRule{
+								RawDefaultDNSRule: option.RawDefaultDNSRule{
+									Geosite: badoption.Listable[string]{"cn"},
+								},
+								DNSRuleAction: option.DNSRuleAction{
+									RouteOptions: option.DNSRouteActionOptions{
+										Server: "localDns",
+									},
+								},
+							},
+						},
+						{
+							Type: "default",
+							DefaultOptions: option.DefaultDNSRule{
+								RawDefaultDNSRule: option.RawDefaultDNSRule{
+									Geosite: badoption.Listable[string]{"geolocation-!cn"},
+								},
+								DNSRuleAction: option.DNSRuleAction{
+									RouteOptions: option.DNSRouteActionOptions{
+										Server: "proxyDns",
+									},
+								},
 							},
 						},
 					},
-					{
-						Type: "default",
-						DefaultOptions: option.DefaultDNSRule{
-							Server: "proxyDns",
-							Geosite: []string{
-								"geolocation-!cn",
-							},
-						},
+					DNSClientOptions: option.DNSClientOptions{
+						DisableCache: false,
 					},
-				},
-				DNSClientOptions: option.DNSClientOptions{
-					DisableCache: true,
 				},
 			},
 			Inbounds: []option.Inbound{
 				{
 					Type: "tun",
 					Tag:  "tun-in",
-					TunOptions: option.TunInboundOptions{
-
+					Options: &option.TunInboundOptions{
 						InterfaceName: "utun225",
-						MTU:           9000,
-						Address: option.Listable[netip.Prefix]{
+						MTU:           1420,
+						Address: badoption.Listable[netip.Prefix]{
 							netip.MustParsePrefix("172.25.0.1/30"),
 						},
 						AutoRoute:              true,
@@ -195,9 +218,8 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 				{
 					Type: "socks",
 					Tag:  "socks-in",
-					SocksOptions: option.SocksInboundOptions{
+					Options: &option.SocksInboundOptions{
 						ListenOptions: option.ListenOptions{
-							Listen:     option.NewListenAddress(netip.MustParseAddr("0.0.0.0")),
 							ListenPort: 5123,
 							InboundOptions: option.InboundOptions{
 								SniffEnabled: true,
@@ -222,15 +244,27 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 					{
 						Type: "default",
 						DefaultOptions: option.DefaultRule{
-							Protocol: option.Listable[string]{"dns"},
-							Outbound: "dns_out",
+							RawDefaultRule: option.RawDefaultRule{
+								Protocol: badoption.Listable[string]{"dns"},
+							},
+							RuleAction: option.RuleAction{
+								RouteOptions: option.RouteActionOptions{
+									Outbound: "dns_out",
+								},
+							},
 						},
 					},
 					{
 						Type: "default",
 						DefaultOptions: option.DefaultRule{
-							Inbound:  option.Listable[string]{"dns_in"},
-							Outbound: "dns_out",
+							RawDefaultRule: option.RawDefaultRule{
+								Inbound: badoption.Listable[string]{"dns_in"},
+							},
+							RuleAction: option.RuleAction{
+								RouteOptions: option.RouteActionOptions{
+									Outbound: "dns_out",
+								},
+							},
 						},
 					},
 				},
@@ -257,65 +291,123 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 		{
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
-				Network:  option.Listable[string]{"udp"},
-				Port:     []uint16{443},
-				Outbound: "block",
+				RawDefaultRule: option.RawDefaultRule{
+					Network: badoption.Listable[string]{"udp"},
+					Port:    badoption.Listable[uint16]{443},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: "block",
+					},
+				},
 			},
 		},
 		{
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
-				Geosite:  option.Listable[string]{"cn"},
-				Outbound: "direct",
+				RawDefaultRule: option.RawDefaultRule{
+					Geosite: badoption.Listable[string]{"cn"},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: "direct",
+					},
+				},
 			},
 		},
 		{
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
-				GeoIP:    option.Listable[string]{"cn", "private"},
-				Outbound: "direct",
+				RawDefaultRule: option.RawDefaultRule{
+					GeoIP: badoption.Listable[string]{"cn", "private"},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: "direct",
+					},
+				},
 			},
 		},
 		{
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
-				IPCIDR: option.Listable[string]{
-					"85.236.96.0/21",
-					"188.42.95.0/24",
-					"188.42.147.0/24"},
-				Outbound: "direct",
+				RawDefaultRule: option.RawDefaultRule{
+					IPCIDR: badoption.Listable[string]{
+						"85.236.96.0/21",
+						"188.42.95.0/24",
+						"188.42.147.0/24",
+					},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: "direct",
+					},
+				},
 			},
-		}, {
+		},
+		{
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
-				DomainSuffix: option.Listable[string]{
-					"vivox.com",
-					"cm.steampowered.com",
-					"steamchina.com",
-					"steamcontent.com",
-					"steamserver.net",
-					"steamusercontent.com",
-					"csgo.wmsj.cn",
-					"dl.steam.clngaa.com",
-					"dl.steam.ksyna.com",
-					"dota2.wmsj.cn",
-					"st.dl.bscstorage.net",
-					"st.dl.eccdnx.com",
-					"st.dl.pinyuncloud.com",
-					"steampipe.steamcontent.tnkjmec.com",
-					"steampowered.com.8686c.com",
-					"steamstatic.com.8686c.com",
-					"wmsjsteam.com",
-					"xz.pphimalayanrt.com"},
-				Outbound: "direct",
+				RawDefaultRule: option.RawDefaultRule{
+					DomainSuffix: badoption.Listable[string]{
+						"vivox.com",
+						"cm.steampowered.com",
+						"steamchina.com",
+						"steamcontent.com",
+						"steamserver.net",
+						"steamusercontent.com",
+						"csgo.wmsj.cn",
+						"dl.steam.clngaa.com",
+						"dl.steam.ksyna.com",
+						"dota2.wmsj.cn",
+						"st.dl.bscstorage.net",
+						"st.dl.eccdnx.com",
+						"st.dl.pinyuncloud.com",
+						"steampipe.steamcontent.tnkjmec.com",
+						"steampowered.com.8686c.com",
+						"steamstatic.com.8686c.com",
+						"wmsjsteam.com",
+						"xz.pphimalayanrt.com",
+					},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: "direct",
+					},
+				},
 			},
 		},
 	}...)
 	options.Options.Route.Rules = append(options.Options.Route.Rules, rules...)
 	// http
 	if httpPeer != nil && httpPeer.Name != gamePeer.Name {
-		options.Options.Route.Rules = append(options.Options.Route.Rules, option.Rule{Type: "default", DefaultOptions: option.DefaultRule{Protocol: option.Listable[string]{"http"}, Outbound: httpOut.Tag}})
-		options.Options.Route.Rules = append(options.Options.Route.Rules, option.Rule{Type: "default", DefaultOptions: option.DefaultRule{Network: option.Listable[string]{"tcp"}, Port: []uint16{80, 443, 8080, 8443}, Outbound: httpOut.Tag}})
+		options.Options.Route.Rules = append(options.Options.Route.Rules, option.Rule{
+			Type: "default",
+			DefaultOptions: option.DefaultRule{
+				RawDefaultRule: option.RawDefaultRule{
+					Protocol: badoption.Listable[string]{"http"},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: httpOut.Tag,
+					},
+				},
+			},
+		})
+		options.Options.Route.Rules = append(options.Options.Route.Rules, option.Rule{
+			Type: "default",
+			DefaultOptions: option.DefaultRule{
+				RawDefaultRule: option.RawDefaultRule{
+					Network: badoption.Listable[string]{"tcp"},
+					Port:    badoption.Listable[uint16]{80, 443, 8080, 8443},
+				},
+				RuleAction: option.RuleAction{
+					RouteOptions: option.RouteActionOptions{
+						Outbound: httpOut.Tag,
+					},
+				},
+			},
+		})
 	}
 	if config.Debug.Load() {
 		options.Log = &option.LogOptions{

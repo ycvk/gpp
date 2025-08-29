@@ -123,15 +123,23 @@ const showUpDowInfo = ref(false)
 const newUrl = ref()
 
 let time = ref()
+let pollInterval = ref(3000) // 默认3秒轮询
+let lastState = ref<string | null>(null) // 记录上次状态
+
 onMounted(() => {
   getStatus()
-  time.value = setInterval(() => {
-    getStatus()
-  }, 1000);
+  // 智能轮询：状态变化时加快，稳定时减慢
+  const smartPolling = () => {
+    time.value = setTimeout(() => {
+      getStatus()
+      smartPolling()
+    }, pollInterval.value)
+  }
+  smartPolling()
 })
 
 onBeforeMount(() => {
-  clearInterval(time.value)
+  clearTimeout(time.value)
   time.value = null;
 })
 
@@ -208,10 +216,27 @@ const getStatus = () => {
       down.value = res.down
       btnDisabled.value = false
       btnText.value = state.value ? '结束加速' : '开始加速'
+      
+      // 智能调整轮询频率
+      const currentState = JSON.stringify({
+        game: res.game_peer?.name,
+        http: res.http_peer?.name,
+        state: state.value
+      })
+      
+      if (lastState.value !== currentState) {
+        // 状态变化，加快轮询
+        pollInterval.value = 1000
+        lastState.value = currentState
+      } else if (pollInterval.value < 5000) {
+        // 状态稳定，逐渐减慢轮询，最多5秒
+        pollInterval.value = Math.min(pollInterval.value + 500, 5000)
+      }
       return;
     }
     btnText.value = '没有节点'
     btnDisabled.value = true
+    pollInterval.value = 5000 // 无节点时慢速轮询
   })
 }
 
