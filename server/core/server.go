@@ -8,24 +8,27 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	box "github.com/sagernet/sing-box"
-	"github.com/sagernet/sing-box/option"
-	"github.com/sagernet/sing/common/auth"
 	"math/big"
 	"net/netip"
 	"time"
+
+	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/option"
+	"github.com/sagernet/sing/common/auth"
+	"github.com/sagernet/sing/common/json/badoption"
 )
 
 func Server(conf Peer) error {
 	var in option.Inbound
 	switch conf.Protocol {
 	case "shadowsocks":
+		listenAddr := badoption.Addr(netip.MustParseAddr(conf.Addr))
 		in = option.Inbound{
 			Type: "shadowsocks",
 			Tag:  "ss-in",
-			ShadowsocksOptions: option.ShadowsocksInboundOptions{
+			Options: &option.ShadowsocksInboundOptions{
 				ListenOptions: option.ListenOptions{
-					Listen:     option.NewListenAddress(netip.MustParseAddr(conf.Addr)),
+					Listen:     &listenAddr,
 					ListenPort: conf.Port,
 				},
 				Method:   "aes-256-gcm",
@@ -36,12 +39,13 @@ func Server(conf Peer) error {
 			},
 		}
 	case "socks":
+		listenAddr := badoption.Addr(netip.MustParseAddr(conf.Addr))
 		in = option.Inbound{
 			Type: "socks",
 			Tag:  "socks-in",
-			SocksOptions: option.SocksInboundOptions{
+			Options: &option.SocksInboundOptions{
 				ListenOptions: option.ListenOptions{
-					Listen:     option.NewListenAddress(netip.MustParseAddr(conf.Addr)),
+					Listen:     &listenAddr,
 					ListenPort: conf.Port,
 				},
 				Users: []auth.User{
@@ -54,12 +58,13 @@ func Server(conf Peer) error {
 		}
 	case "hysteria2":
 		c, k := generateKey()
+		listenAddr := badoption.Addr(netip.MustParseAddr(conf.Addr))
 		in = option.Inbound{
 			Type: "hysteria2",
 			Tag:  "hy2-in",
-			Hysteria2Options: option.Hysteria2InboundOptions{
+			Options: &option.Hysteria2InboundOptions{
 				ListenOptions: option.ListenOptions{
-					Listen:     option.NewListenAddress(netip.MustParseAddr(conf.Addr)),
+					Listen:     &listenAddr,
 					ListenPort: conf.Port,
 				},
 				Users: []option.Hysteria2User{
@@ -72,20 +77,21 @@ func Server(conf Peer) error {
 					TLS: &option.InboundTLSOptions{
 						Enabled:     true,
 						ServerName:  "gpp",
-						ALPN:        option.Listable[string]{"h3"},
-						Certificate: option.Listable[string]{c},
-						Key:         option.Listable[string]{k},
+						ALPN:        badoption.Listable[string]{"h3"},
+						Certificate: badoption.Listable[string]{c},
+						Key:         badoption.Listable[string]{k},
 					},
 				},
 			},
 		}
 	default:
+		listenAddr := badoption.Addr(netip.MustParseAddr(conf.Addr))
 		in = option.Inbound{
 			Type: "vless",
 			Tag:  "vless-in",
-			VLESSOptions: option.VLESSInboundOptions{
+			Options: &option.VLESSInboundOptions{
 				ListenOptions: option.ListenOptions{
-					Listen:     option.NewListenAddress(netip.MustParseAddr(conf.Addr)),
+					Listen:     &listenAddr,
 					ListenPort: conf.Port,
 				},
 				Users: []option.VLESSUser{
