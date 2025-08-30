@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import AppHeader from './AppHeader.vue'
+import AppFooter from './AppFooter.vue'
 
 interface Props {
   connectionStatus?: 'idle' | 'connecting' | 'connected' | 'error'

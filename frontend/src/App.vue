@@ -3,7 +3,11 @@
     <n-message-provider>
       <n-loading-bar-provider>
         <AppLayout>
-          <router-view />
+          <router-view v-slot="{ Component, route }">
+            <transition name="page-transition" mode="out-in">
+              <component :is="Component" :key="route.path" />
+            </transition>
+          </router-view>
         </AppLayout>
       </n-loading-bar-provider>
     </n-message-provider>
@@ -27,5 +31,29 @@ const theme = computed(() => {
   width: 360px;
   overflow: hidden;
   position: relative;
+}
+
+/* 页面切换动画 - 适合桌面应用的轻量动画 */
+.page-transition-enter-active,
+.page-transition-leave-active {
+  transition: all 0.25s ease-out;
+}
+
+.page-transition-enter-from {
+  opacity: 0;
+  transform: translateX(15px);
+}
+
+.page-transition-leave-to {
+  opacity: 0;
+  transform: translateX(-15px);
+}
+
+/* 确保切换过程中的定位 */
+.page-transition-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 </style>

@@ -1,7 +1,17 @@
 <template>
   <div class="dashboard">
+    <!-- 错误状态显示 -->
+    <ErrorState
+      v-if="showErrorState"
+      :type="errorType"
+      :message="errorMessage"
+      @retry="handleErrorRetry"
+      @help="handleErrorHelp"
+    />
+    
     <!-- 连接状态显示 -->
     <ConnectionStatus
+      v-else
       :status="connectionStatus"
       :game-node="status.gamePeer"
       :http-node="status.httpPeer" 
@@ -33,7 +43,11 @@
           @click="handleNodeSettings"
         >
           <template #icon>
-            <i class="i-ionicons-settings-outline" />
+            <n-icon :size="18">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5a3.5 3.5 0 0 1-3.5 3.5m7.43-2.53c.04-.32.07-.64.07-.97c0-.33-.03-.66-.07-1l2.11-1.63c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.04.34-.07.67-.07 1c0 .33.03.65.07.97l-2.11 1.66c-.19.15-.25.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1.01c.52.4 1.06.74 1.69.99l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.26 1.17-.59 1.69-.99l2.49 1.01c.22.08.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64z"/>
+              </svg>
+            </n-icon>
           </template>
           节点设置
         </n-button>
@@ -45,7 +59,11 @@
           :loading="isRefreshing"
         >
           <template #icon>
-            <i class="i-ionicons-refresh-outline" />
+            <n-icon :size="18">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+            </n-icon>
           </template>
           刷新
         </n-button>
@@ -71,11 +89,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, watchEffect } from 'vue'
 import { useProxyState } from '@/composables/useProxyState'
 import { useNodeManager } from '@/composables/useNodeManager'
+import { NIcon } from 'naive-ui'
 import ConnectionStatus from '@/components/business/ConnectionStatus.vue'
 import NodeSelectorModal from '@/components/business/NodeSelectorModal.vue'
+import ErrorState from '@/components/ui/ErrorState.vue'
 import type { Peer } from '@/types/models'
 
 // 状态管理
@@ -89,14 +109,12 @@ const {
   setPeerNodes
 } = useProxyState()
 
-// 临时节点管理模拟 - 实际应该使用 useNodeManager
-const isRefreshing = ref(false)
-const refreshNodes = async () => {
-  isRefreshing.value = true
-  // Simulate refresh
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  isRefreshing.value = false
-}
+// 节点管理
+const {
+  refreshNodes,
+  pingAll,
+  isLoading: isRefreshing
+} = useNodeManager()
 
 // UI状态
 const showNodeSelector = ref(false)
@@ -129,6 +147,28 @@ const trafficData = computed(() => {
   }
 })
 
+// 错误状态计算
+const showErrorState = computed(() => {
+  return connectionStatus.value === 'error' && !isConnected.value
+})
+
+const errorType = computed(() => {
+  if (connectionStatus.value === 'error') {
+    if (!status.gamePeer || !status.httpPeer) {
+      return 'config' as const
+    }
+    return 'connection' as const
+  }
+  return 'unknown' as const
+})
+
+const errorMessage = computed(() => {
+  if (!status.gamePeer || !status.httpPeer) {
+    return '请先选择游戏节点和网页节点'
+  }
+  return '无法连接到代理服务器，请检查网络设置'
+})
+
 // 事件处理
 const handlePrimaryAction = async () => {
   if (isConnected.value) {
@@ -150,7 +190,7 @@ const handleNodeSettings = () => {
 
 const handleRefreshNodes = async () => {
   await refreshNodes()
-  // 这里应该也调用 pingNodes 等方法
+  await pingAll()
 }
 
 const handleNodeConfirm = async (gameNode: Peer | null, httpNode: Peer | null) => {
@@ -161,23 +201,38 @@ const handleNodeConfirm = async (gameNode: Peer | null, httpNode: Peer | null) =
   showNodeSelector.value = false
 }
 
-// 定期ping检测 - 这里应该集成到 useNodeManager 中
-const updatePingValues = async () => {
-  try {
-    if (status.gamePeer) {
-      // 实际应该调用PingAll或单独ping方法
-      gamePing.value = Math.floor(Math.random() * 200) + 20
-    }
-    if (status.httpPeer) {
-      httpPing.value = Math.floor(Math.random() * 200) + 20  
-    }
-  } catch (error) {
-    console.error('Ping检测失败:', error)
+// 错误处理方法
+const handleErrorRetry = async () => {
+  if (!status.gamePeer || !status.httpPeer) {
+    // 如果没有节点，打开节点选择器
+    showNodeSelector.value = true
+  } else {
+    // 否则尝试重新连接
+    await startProxy()
   }
 }
 
-// 定期更新ping值
-setInterval(updatePingValues, 30000)
+const handleErrorHelp = () => {
+  // 可以打开帮助文档或显示故障排除提示
+  console.log('显示帮助信息')
+  // 这里可以集成帮助文档或FAQ
+}
+
+// 定期更新ping值（使用composable管理）
+onMounted(() => {
+  // 初始化时更新节点ping值
+  if (status.gamePeer || status.httpPeer) {
+    pingAll()
+  }
+})
+
+// 使用 watchEffect 监听节点变化
+watchEffect(() => {
+  if (status.gamePeer || status.httpPeer) {
+    // 节点变化时自动更新ping
+    pingAll()
+  }
+})
 </script>
 
 <style scoped>

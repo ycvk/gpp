@@ -1,14 +1,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, readonly } from 'vue'
-// Note: These imports should be available once the Wails app is built
-// import { Status, Start, Stop, SetPeer, PingAll } from '@/wailsjs/go/main/App'
+import { Status, Start, Stop, SetPeer } from '../../wailsjs/go/main/App'
 import type { Peer, ProxyStatus } from '@/types/models'
 import { useMessage } from 'naive-ui'
-
-// Temporary mock functions for development - replace with actual Wails imports
-const Status = async () => ({ running: false, game_peer: null, http_peer: null, up: 0, down: 0 })
-const Start = async () => 'ok'
-const Stop = async () => 'ok'  
-const SetPeer = async (game: string, http: string) => 'ok'
 
 export const useProxyState = () => {
   const message = useMessage()
@@ -50,13 +43,13 @@ export const useProxyState = () => {
     try {
       const result = await Status()
       
-      // 更新状态 - 根据实际API返回字段调整
-      status.isRunning = result.running || false  // 注意：字段名是running不是is_running
+      // 更新状态 - 使用Wails返回的实际字段名
+      status.isRunning = result.running || false
       status.gamePeer = result.game_peer || null
       status.httpPeer = result.http_peer || null
       status.upSpeed = result.up || 0
       status.downSpeed = result.down || 0
-      // 注意：当前API没有total_up/total_down字段，需要前端累计
+      // 累计流量（API不返回总量，需要前端累计）
       status.totalUp = (status.totalUp || 0) + (result.up || 0)
       status.totalDown = (status.totalDown || 0) + (result.down || 0)
       

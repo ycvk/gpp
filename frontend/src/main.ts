@@ -1,5 +1,4 @@
 import { createApp } from 'vue'
-import { createRouter, createWebHashHistory } from 'vue-router'
 import {
   create,
   NMessageProvider,
@@ -12,13 +11,19 @@ import {
   NSpace,
   NSelect,
   NInput,
+  NInputNumber,
+  NSwitch,
   NIcon,
   NTag,
   NText,
-  NTooltip
+  NTooltip,
+  NTabs,
+  NTabPane,
+  NResult,
+  NSkeleton
 } from 'naive-ui'
 import App from './App.vue'
-import routes from './router'
+import router from './router'
 import '@/styles/globals.css'
 
 // Naive UI 组件注册
@@ -34,17 +39,17 @@ const naive = create({
     NSpace,
     NSelect,
     NInput,
+    NInputNumber,
+    NSwitch,
     NIcon,
     NTag,
     NText,
-    NTooltip
+    NTooltip,
+    NTabs,
+    NTabPane,
+    NResult,
+    NSkeleton
   ]
-})
-
-// 路由系统
-const router = createRouter({
-  history: createWebHashHistory(),
-  routes
 })
 
 const app = createApp(App)

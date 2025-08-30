@@ -20,8 +20,8 @@
       <h4 class="node-name" :title="node?.name">
         {{ displayName }}
       </h4>
-      <p v-if="node?.server" class="node-server">
-        {{ node.server }}
+      <p v-if="node?.addr" class="node-server">
+        {{ node.addr }}
       </p>
     </div>
     

@@ -124,12 +124,40 @@ const refreshNodes = async () => {
   isLoadingNodes.value = true
   await new Promise(resolve => setTimeout(resolve, 1000))
   gameNodes.value = [
-    { name: '游戏节点1', server: 'hk.example.com' },
-    { name: '游戏节点2', server: 'sg.example.com' }
+    { 
+      name: '游戏节点1', 
+      protocol: 'shadowsocks',
+      port: 8388,
+      addr: 'hk.example.com',
+      uuid: 'uuid-1',
+      ping: 50
+    },
+    { 
+      name: '游戏节点2', 
+      protocol: 'vmess',
+      port: 443,
+      addr: 'sg.example.com',
+      uuid: 'uuid-2',
+      ping: 30
+    }
   ]
   httpNodes.value = [
-    { name: 'HTTP节点1', server: 'us.example.com' },
-    { name: 'HTTP节点2', server: 'jp.example.com' }
+    { 
+      name: 'HTTP节点1', 
+      protocol: 'shadowsocks',
+      port: 8388,
+      addr: 'us.example.com',
+      uuid: 'uuid-3',
+      ping: 150
+    },
+    { 
+      name: 'HTTP节点2', 
+      protocol: 'vmess',
+      port: 443,
+      addr: 'jp.example.com',
+      uuid: 'uuid-4',
+      ping: 80
+    }
   ]
   isLoadingNodes.value = false
 }
@@ -161,7 +189,7 @@ const showModal = computed({
 
 const gameNodeOptions = computed(() => {
   return gameNodes.value.map(node => ({
-    label: `${node.name} (${node.server || '未知'})`,
+    label: `${node.name} (${node.addr || '未知'})`,
     value: node.name,
     node: node
   }))
@@ -169,7 +197,7 @@ const gameNodeOptions = computed(() => {
 
 const httpNodeOptions = computed(() => {
   return httpNodes.value.map(node => ({
-    label: `${node.name} (${node.server || '未知'})`,
+    label: `${node.name} (${node.addr || '未知'})`,
     value: node.name, 
     node: node
   }))

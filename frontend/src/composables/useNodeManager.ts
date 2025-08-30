@@ -1,12 +1,7 @@
 import { ref, reactive, computed, readonly } from 'vue'
-// import { List, Add, PingAll } from '@/wailsjs/go/main/App'
+import { List, Add, PingAll } from '../../wailsjs/go/main/App'
 import type { Peer } from '@/types/models'
 import { useMessage } from 'naive-ui'
-
-// Temporary mock functions for development
-const List = async () => [] as Peer[]
-const Add = async (url: string) => 'ok'
-const PingAll = async () => {}
 
 export const useNodeManager = () => {
   const message = useMessage()
@@ -21,8 +16,7 @@ export const useNodeManager = () => {
   const gameNodes = computed(() => {
     return allNodes.value.filter(node => 
       node.name.startsWith('game') || 
-      node.name.includes('游戏') ||
-      node.type === 'game'
+      node.name.includes('游戏')
     )
   })
   
@@ -30,7 +24,6 @@ export const useNodeManager = () => {
     return allNodes.value.filter(node => 
       node.name.startsWith('http') || 
       node.name.includes('网页') ||
-      node.type === 'http' ||
       (!node.name.startsWith('game') && !node.name.includes('游戏'))
     )
   })
@@ -120,7 +113,7 @@ export const useNodeManager = () => {
     const searchTerm = keyword.toLowerCase()
     return allNodes.value.filter(node =>
       node.name.toLowerCase().includes(searchTerm) ||
-      (node.server && node.server.toLowerCase().includes(searchTerm))
+      (node.addr && node.addr.toLowerCase().includes(searchTerm))
     )
   }
   
