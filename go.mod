@@ -86,3 +86,5 @@ require (
 )
 
 replace golang.org/x/tools => golang.org/x/tools v0.36.0
+
+replace github.com/wailsapp/go-webview2 => github.com/wailsapp/go-webview2 v1.0.10

@@ -54,10 +54,18 @@ jobs:
           go-version-file: ./go.mod
       - run: go version
       - run: node -v
-      - name: Install dependencies
-        run: |
-          cd frontend && npm install
-          go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      - name: Install frontend dependencies
+        run: cd frontend && npm install
+      
+      # Install Wails - Windows specific version
+      - name: Install Wails (Windows)
+        if: runner.os == 'Windows'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+      
+      # Install Wails - Other platforms
+      - name: Install Wails (macOS/Linux)
+        if: runner.os != 'Windows'
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       # Dependencies: GNU/Linux
       - name: Update system and dependencies

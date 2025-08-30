@@ -14,6 +14,7 @@ declare module 'vue' {
     ErrorState: typeof import('./src/components/ui/ErrorState.vue')['default']
     HelloWorld: typeof import('./src/components/HelloWorld.vue')['default']
     Layout: typeof import('./src/components/Layout.vue')['default']
+    NAlert: typeof import('naive-ui')['NAlert']
     NButton: typeof import('naive-ui')['NButton']
     NCard: typeof import('naive-ui')['NCard']
     NConfigProvider: typeof import('naive-ui')['NConfigProvider']
