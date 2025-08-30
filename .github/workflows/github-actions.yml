@@ -57,14 +57,8 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm install
       
-      # Install Wails - Windows specific version
-      - name: Install Wails (Windows)
-        if: runner.os == 'Windows'
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
-      
-      # Install Wails - Other platforms
-      - name: Install Wails (macOS/Linux)
-        if: runner.os != 'Windows'
+      # Install Wails
+      - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       # Dependencies: GNU/Linux
