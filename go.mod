@@ -84,3 +84,5 @@ require (
 	golang.org/x/time v0.12.0 // indirect
 	golang.org/x/tools v0.36.0 // indirect
 )
+
+replace github.com/wailsapp/go-webview2 => github.com/wailsapp/go-webview2 v1.0.16
