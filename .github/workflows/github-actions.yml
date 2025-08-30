@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend && npm install
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.2
+          go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
       # Dependencies: GNU/Linux
       - name: Update system and dependencies

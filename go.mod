@@ -1,6 +1,6 @@
 module github.com/danbai225/gpp
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/cloverstd/tcping v0.1.1
@@ -85,4 +85,4 @@ require (
 	golang.org/x/tools v0.36.0 // indirect
 )
 
-replace github.com/wailsapp/go-webview2 => github.com/wailsapp/go-webview2 v1.0.16
+replace golang.org/x/tools => golang.org/x/tools v0.36.0
