@@ -183,6 +183,26 @@ func (cl *ConfigLoader) Load() (*Config, error) {
 		return nil, fmt.Errorf("parse config failed: %w", err)
 	}
 	
+	// 确保总是有直连节点
+	hasDirectNode := false
+	for _, peer := range conf.PeerList {
+		if peer.Protocol == "direct" {
+			hasDirectNode = true
+			break
+		}
+	}
+	if !hasDirectNode {
+		// 在列表开头添加直连节点
+		directNode := &Peer{
+			Name:     "直连",
+			Protocol: "direct",
+			Port:     0,
+			Addr:     "direct",
+			UUID:     "",
+		}
+		conf.PeerList = append([]*Peer{directNode}, conf.PeerList...)
+	}
+	
 	// 更新订阅
 	if conf.SubAddr != "" {
 		updatedPeers, err := cl.subManager.UpdateFromSubscription(conf.SubAddr, conf.PeerList)
@@ -225,7 +245,15 @@ func (cl *ConfigLoader) Init() error {
 	// 如果文件不存在，创建默认配置
 	if _, err := os.Stat(cl.pathManager.GetPath()); os.IsNotExist(err) {
 		defaultConfig := &Config{
-			PeerList: make([]*Peer, 0),
+			PeerList: []*Peer{
+				{
+					Name:     "直连",
+					Protocol: "direct",
+					Port:     0,
+					Addr:     "direct",
+					UUID:     "",
+				},
+			},
 			ProxyDNS: "https://1.1.1.1/dns-query",
 			LocalDNS: "https://223.5.5.5/dns-query",
 		}

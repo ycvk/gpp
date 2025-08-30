@@ -220,19 +220,14 @@ const handleErrorHelp = () => {
 
 // 定期更新ping值（使用composable管理）
 onMounted(() => {
-  // 初始化时更新节点ping值
+  // 初始化时更新节点ping值，不显示消息
   if (status.gamePeer || status.httpPeer) {
-    pingAll()
+    pingAll(false)  // 不显示消息
   }
 })
 
-// 使用 watchEffect 监听节点变化
-watchEffect(() => {
-  if (status.gamePeer || status.httpPeer) {
-    // 节点变化时自动更新ping
-    pingAll()
-  }
-})
+// 移除 watchEffect，避免循环触发
+// 只在需要时手动调用 pingAll
 </script>
 
 <style scoped>

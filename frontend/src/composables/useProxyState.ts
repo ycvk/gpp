@@ -160,8 +160,13 @@ export const useProxyState = () => {
       const result = await SetPeer(gameNode.name, httpNode.name)
       
       if (result === 'ok') {
+        // 立即更新本地状态
         status.gamePeer = gameNode
         status.httpPeer = httpNode
+        
+        // 立即刷新状态以确保同步
+        await updateStatus()
+        
         message.success('节点设置成功')
         return true
       } else {

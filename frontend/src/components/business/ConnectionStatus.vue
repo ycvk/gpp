@@ -23,14 +23,14 @@
         :node="gameNode"
         type="game"
         :ping="gamePing"
-        @click="handleNodeSelect('game')"
+        @change="handleNodeSelect('game')"
       />
       <NodeCard 
         v-if="httpNode" 
         :node="httpNode"
         type="http"
         :ping="httpPing"
-        @click="handleNodeSelect('http')"
+        @change="handleNodeSelect('http')"
       />
     </div>
     

@@ -183,7 +183,9 @@
             <div class="setting-item">
               <n-button @click="clearCache">清理缓存</n-button>
               <n-button @click="exportConfig">导出配置</n-button>
-              <n-button @click="importConfig">导入配置</n-button>
+              <n-button @click="importConfig" :loading="isImporting" :disabled="isImporting">
+                {{ isImporting ? '导入中...' : '导入配置' }}
+              </n-button>
             </div>
             
             <h3>关于</h3>
@@ -214,9 +216,14 @@
 import { ref, reactive, computed } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useMessage, NIcon } from 'naive-ui'
+import { useNodeManager } from '@/composables/useNodeManager'
 
 const router = useRouter()
 const message = useMessage()
+const { importSingBoxConfig } = useNodeManager()
+
+// 导入加载状态
+const isImporting = ref(false)
 
 // 设置数据
 const settings = reactive({
@@ -312,9 +319,70 @@ const exportConfig = () => {
   message.info('配置导出功能开发中...')
 }
 
-const importConfig = () => {
-  // TODO: 实现配置导入
-  message.info('配置导入功能开发中...')
+const importConfig = async () => {
+  try {
+    // 创建文件输入元素
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.multiple = false
+    
+    // 文件选择处理
+    input.onchange = async (event: Event) => {
+      const target = event.target as HTMLInputElement
+      const file = target.files?.[0]
+      
+      if (!file) {
+        return
+      }
+      
+      // 文件验证
+      if (!file.name.endsWith('.json')) {
+        message.error('请选择JSON格式的配置文件')
+        return
+      }
+      
+      if (file.size > 1024 * 1024) { // 1MB限制
+        message.error('配置文件过大，请选择小于1MB的文件')
+        return
+      }
+      
+      // 读取文件内容
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          const configContent = e.target?.result as string
+          
+          // 调用导入功能
+          isImporting.value = true
+          const result = await importSingBoxConfig(configContent)
+          
+          if (result) {
+            message.success('sing-box配置导入成功')
+          }
+          
+        } catch (error: any) {
+          console.error('Import error:', error)
+          message.error(`导入失败: ${error.message || error}`)
+        } finally {
+          isImporting.value = false
+        }
+      }
+      
+      reader.onerror = () => {
+        message.error('读取文件失败')
+      }
+      
+      reader.readAsText(file)
+    }
+    
+    // 触发文件选择对话框
+    input.click()
+    
+  } catch (error: any) {
+    console.error('File selection error:', error)
+    message.error('文件选择失败')
+  }
 }
 
 const checkUpdate = () => {

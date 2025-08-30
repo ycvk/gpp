@@ -1,13 +1,13 @@
 <template>
-  <n-modal 
+  <n-modal
     v-model:show="showModal"
-    :mask-closable="false"
     preset="card"
-    title="节点设置"
-    style="width: 320px;"
-    :segmented="true"
+    :title="type === 'game' ? '游戏节点设置' : 'HTTP节点设置'"
+    style="width: 600px"
+    :bordered="false"
   >
-    <n-tabs v-model:value="activeTab" type="segment">
+    <n-tabs v-model:value="activeTab" type="line">
+      <!-- 节点选择标签页 -->
       <n-tab-pane name="select" tab="选择节点">
         <div class="node-selection">
           <!-- 游戏节点选择 -->
@@ -16,77 +16,89 @@
             <n-select
               v-model:value="selectedGameNode"
               :options="gameNodeOptions"
-              placeholder="选择游戏节点"
-              :loading="isLoadingNodes"
+              placeholder="请选择游戏节点"
+              :loading="isLoading"
               clearable
-              filterable
             />
           </div>
           
-          <!-- 网页节点选择 -->
+          <!-- HTTP节点选择 -->
           <div class="node-group">
-            <label class="node-label">网页节点</label>
+            <label class="node-label">HTTP节点</label>
             <n-select
               v-model:value="selectedHttpNode"
               :options="httpNodeOptions"
-              placeholder="选择网页节点"
-              :loading="isLoadingNodes"
+              placeholder="请选择HTTP节点"
+              :loading="isLoading"
               clearable
-              filterable
             />
           </div>
           
-          <!-- 节点ping信息 -->
+          <!-- Ping测试按钮 -->
           <div v-if="showPingInfo" class="ping-info">
             <n-button
-              type="tertiary"
-              size="small"
-              :loading="isPinging"
+              type="primary"
+              ghost
               @click="handlePingTest"
+              :loading="isPinging"
             >
-              <template #icon>
-                <i class="i-ionicons-pulse-outline" />
-              </template>
-              测试延迟
+              {{ isPinging ? '测试中...' : '测试延迟' }}
             </n-button>
           </div>
         </div>
       </n-tab-pane>
       
+      <!-- 导入订阅标签页 -->
       <n-tab-pane name="import" tab="导入订阅">
         <div class="import-subscription">
           <div class="input-group">
-            <label class="input-label">订阅链接</label>
+            <label class="node-label">订阅地址或配置</label>
             <n-input
               v-model:value="subscriptionUrl"
-              placeholder="输入订阅URL"
-              type="text"
-              clearable
+              type="textarea"
+              :rows="4"
+              placeholder="请输入订阅URL、GPP token或sing-box配置JSON"
+              :disabled="isImporting"
             />
           </div>
           
           <n-button
             type="primary"
-            :loading="isImporting"
-            :disabled="!subscriptionUrl"
             block
             @click="handleImportSubscription"
+            :loading="isImporting"
+            :disabled="!subscriptionUrl.trim()"
           >
-            导入订阅
+            {{ isImporting ? '导入中...' : '导入' }}
           </n-button>
+          
+          <n-alert type="info" :show-icon="false">
+            <div style="font-size: 12px;">
+              <p>支持的格式：</p>
+              <ul style="margin: 4px 0 0 20px; padding: 0;">
+                <li>HTTP订阅链接（http://...）</li>
+                <li>GPP分享token</li>
+                <li>sing-box配置JSON（包含outbounds）</li>
+              </ul>
+            </div>
+          </n-alert>
         </div>
       </n-tab-pane>
     </n-tabs>
     
-    <template #action>
-      <div class="modal-actions">
-        <n-button @click="handleCancel">取消</n-button>
-        <n-button 
+    <!-- 底部按钮 -->
+    <template #footer>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <n-button @click="handleCancel">
+          取消
+        </n-button>
+        <n-button
+          v-if="activeTab === 'select'"
           type="primary"
-          :disabled="!canConfirm"
           @click="handleConfirm"
+          :disabled="!canConfirm"
         >
-          确认
+          确定
         </n-button>
       </div>
     </template>
@@ -96,6 +108,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import type { Peer } from '@/types/models'
+import { useNodeManager } from '@/composables/useNodeManager'
+import { useMessage } from 'naive-ui'
 
 interface Props {
   show: boolean
@@ -113,66 +127,20 @@ const emit = defineEmits<{
   confirm: [gameNode: Peer | null, httpNode: Peer | null]
 }>()
 
-// Mock node management - 实际应该使用 useNodeManager
-const gameNodes = ref<Peer[]>([])
-const httpNodes = ref<Peer[]>([])
-const isLoadingNodes = ref(false)
-const isPinging = ref(false)
+const message = useMessage()
 
-const refreshNodes = async () => {
-  // Mock implementation
-  isLoadingNodes.value = true
-  await new Promise(resolve => setTimeout(resolve, 1000))
-  gameNodes.value = [
-    { 
-      name: '游戏节点1', 
-      protocol: 'shadowsocks',
-      port: 8388,
-      addr: 'hk.example.com',
-      uuid: 'uuid-1',
-      ping: 50
-    },
-    { 
-      name: '游戏节点2', 
-      protocol: 'vmess',
-      port: 443,
-      addr: 'sg.example.com',
-      uuid: 'uuid-2',
-      ping: 30
-    }
-  ]
-  httpNodes.value = [
-    { 
-      name: 'HTTP节点1', 
-      protocol: 'shadowsocks',
-      port: 8388,
-      addr: 'us.example.com',
-      uuid: 'uuid-3',
-      ping: 150
-    },
-    { 
-      name: 'HTTP节点2', 
-      protocol: 'vmess',
-      port: 443,
-      addr: 'jp.example.com',
-      uuid: 'uuid-4',
-      ping: 80
-    }
-  ]
-  isLoadingNodes.value = false
-}
-
-const pingAll = async () => {
-  isPinging.value = true
-  await new Promise(resolve => setTimeout(resolve, 2000))
-  isPinging.value = false
-}
-
-const importSubscription = async (url: string) => {
-  // Mock implementation
-  await new Promise(resolve => setTimeout(resolve, 1500))
-  return true
-}
+// 使用真实的节点管理器
+const {
+  allNodes,
+  gameNodes,
+  httpNodes,
+  isLoading,
+  isPinging,
+  refreshNodes,
+  pingAll,
+  importSubscription,
+  importSingBoxConfig
+} = useNodeManager()
 
 // 本地状态
 const activeTab = ref('select')
@@ -188,19 +156,37 @@ const showModal = computed({
 })
 
 const gameNodeOptions = computed(() => {
-  return gameNodes.value.map(node => ({
-    label: `${node.name} (${node.addr || '未知'})`,
-    value: node.name,
-    node: node
-  }))
+  return gameNodes.value.map(node => {
+    let label = node.name
+    if (node.addr) {
+      label += ` (${node.addr})`
+    }
+    if (node.ping && node.ping > 0) {
+      label += ` - ${node.ping}ms`
+    }
+    return {
+      label,
+      value: node.name,
+      node: node
+    }
+  })
 })
 
 const httpNodeOptions = computed(() => {
-  return httpNodes.value.map(node => ({
-    label: `${node.name} (${node.addr || '未知'})`,
-    value: node.name, 
-    node: node
-  }))
+  return httpNodes.value.map(node => {
+    let label = node.name
+    if (node.addr) {
+      label += ` (${node.addr})`
+    }
+    if (node.ping && node.ping > 0) {
+      label += ` - ${node.ping}ms`
+    }
+    return {
+      label,
+      value: node.name, 
+      node: node
+    }
+  })
 })
 
 const showPingInfo = computed(() => {
@@ -231,15 +217,53 @@ const handlePingTest = async () => {
 }
 
 const handleImportSubscription = async () => {
-  if (!subscriptionUrl.value) return
+  if (!subscriptionUrl.value.trim()) {
+    message.warning('请输入订阅地址或配置内容')
+    return
+  }
   
   try {
     isImporting.value = true
-    await importSubscription(subscriptionUrl.value)
+    const content = subscriptionUrl.value.trim()
     
-    // 导入成功后切换到选择标签页
-    activeTab.value = 'select'
-    await refreshNodes()
+    // 判断是否为 sing-box 配置
+    let success = false
+    if (content.startsWith('{') && (content.includes('"type"') || content.includes('"outbounds"'))) {
+      // 可能是 sing-box 配置
+      try {
+        success = await importSingBoxConfig(content)
+        if (success) {
+          message.success('sing-box 配置导入成功')
+        }
+      } catch (error: any) {
+        // 如果 sing-box 导入失败，显示具体错误
+        if (error.message && (error.message.includes('入站') || error.message.includes('inbound'))) {
+          message.error(error.message)
+          return
+        }
+        // 其他错误，尝试作为订阅URL
+        success = await importSubscription(content)
+        if (success) {
+          message.success('订阅导入成功')
+        }
+      }
+    } else {
+      // 作为订阅URL或GPP token处理
+      success = await importSubscription(content)
+      if (success) {
+        message.success('导入成功')
+      }
+    }
+    
+    if (success) {
+      // 导入成功后切换到选择标签页
+      activeTab.value = 'select'
+      subscriptionUrl.value = ''
+      await refreshNodes()
+    }
+  } catch (error: any) {
+    console.error('Import error:', error)
+    message.error(`导入失败: ${error.message || error}`)
   } finally {
     isImporting.value = false
   }
@@ -293,16 +317,5 @@ const handleConfirm = () => {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-}
-
-.input-label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-neutral-700);
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--space-3);
 }
 </style>

@@ -14,18 +14,13 @@ export const useNodeManager = () => {
   
   // 计算分类节点
   const gameNodes = computed(() => {
-    return allNodes.value.filter(node => 
-      node.name.startsWith('game') || 
-      node.name.includes('游戏')
-    )
+    // 所有节点都可以作为游戏节点（包括直连）
+    return allNodes.value
   })
   
   const httpNodes = computed(() => {
-    return allNodes.value.filter(node => 
-      node.name.startsWith('http') || 
-      node.name.includes('网页') ||
-      (!node.name.startsWith('game') && !node.name.includes('游戏'))
-    )
+    // 所有节点都可以作为HTTP节点（包括直连）
+    return allNodes.value
   })
   
   // 刷新节点列表 - 优化：避免重复调用
@@ -56,19 +51,27 @@ export const useNodeManager = () => {
   }
   
   // Ping所有节点
-  const pingAll = async () => {
+  const pingAll = async (showMessage = true) => {
     if (allNodes.value.length === 0) {
-      message.warning('暂无节点可测试')
+      if (showMessage) {
+        message.warning('暂无节点可测试')
+      }
       return
     }
     
     try {
       isPinging.value = true
       await PingAll()
-      message.success('延迟测试完成')
+      // Ping完成后刷新节点列表以获取更新的ping值
+      await refreshNodes(true)
+      if (showMessage) {
+        message.success('延迟测试完成')
+      }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Ping测试失败'
-      message.error(errorMsg)
+      if (showMessage) {
+        message.error(errorMsg)
+      }
     } finally {
       isPinging.value = false
     }
@@ -104,6 +107,33 @@ export const useNodeManager = () => {
     }
   }
   
+  // 导入sing-box配置
+  const importSingBoxConfig = async (configContent: string): Promise<boolean> => {
+    try {
+      isLoading.value = true
+      
+      // 调用后端Add接口（复用现有接口）
+      const result = await Add(configContent.trim())
+      
+      if (result === 'ok') {
+        await refreshNodes(true) // 自动刷新节点列表
+        return true
+      } else if (result.includes('imported') && result.includes('skipped')) {
+        // 处理部分成功的情况
+        await refreshNodes(true)
+        return true
+      } else {
+        throw new Error(result)
+      }
+      
+    } catch (error: any) {
+      console.error('Import sing-box config error:', error)
+      throw error
+    } finally {
+      isLoading.value = false
+    }
+  }
+  
   // 搜索节点
   const searchNodes = (keyword: string) => {
     if (!keyword.trim()) {
@@ -130,6 +160,7 @@ export const useNodeManager = () => {
     refreshNodes,
     pingAll,
     importSubscription,
+    importSingBoxConfig,
     searchNodes
   }
 }

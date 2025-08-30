@@ -240,6 +240,12 @@ func (a *App) Add(token string) string {
 	if a.conf.PeerList == nil {
 		a.conf.PeerList = make([]*config.Peer, 0)
 	}
+	
+	// sing-box配置检测
+	if isValidSingBoxConfig(token) {
+		return a.importSingBoxConfig(token)
+	}
+	
 	if strings.HasPrefix(token, "http") {
 		_, err := http.Get(token)
 		if err != nil {
@@ -283,6 +289,89 @@ func (a *App) Add(token string) string {
 		return err.Error()
 	}
 	return "ok"
+}
+
+// isValidSingBoxConfig 检测是否为sing-box配置
+func isValidSingBoxConfig(content string) bool {
+	content = strings.TrimSpace(content)
+	// 检查是否为JSON格式
+	if !strings.HasPrefix(content, "{") {
+		return false
+	}
+	// 支持完整配置（包含outbounds）或单节点配置（包含type字段）
+	return strings.Contains(content, "\"outbounds\"") || 
+		   (strings.Contains(content, "\"type\"") && strings.Contains(content, "\"server\""))
+}
+
+// importSingBoxConfig 导入sing-box配置
+func (a *App) importSingBoxConfig(configJson string) string {
+	peers, err := config.ParseSingBoxConfig(configJson)
+	if err != nil {
+		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "配置解析错误",
+			Message: fmt.Sprintf("解析sing-box配置失败: %v", err),
+		})
+		return err.Error()
+	}
+	
+	successCount, skipCount := a.checkAndMergePeers(peers)
+	
+	// 保存配置
+	err = config.SaveConfig(a.conf)
+	if err != nil {
+		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "保存配置失败",
+			Message: err.Error(),
+		})
+		return err.Error()
+	}
+	
+	// 返回结果信息
+	if skipCount > 0 {
+		message := fmt.Sprintf("成功导入 %d 个节点，跳过 %d 个重复节点", successCount, skipCount)
+		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.InfoDialog,
+			Title:   "导入完成",
+			Message: message,
+		})
+		return fmt.Sprintf("imported %d nodes, skipped %d duplicates", successCount, skipCount)
+	}
+	
+	if successCount > 0 {
+		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.InfoDialog,
+			Title:   "导入成功",
+			Message: fmt.Sprintf("成功导入 %d 个节点", successCount),
+		})
+	}
+	
+	return "ok"
+}
+
+// checkAndMergePeers 批量节点去重和合并
+func (a *App) checkAndMergePeers(newPeers []*config.Peer) (int, int) {
+	successCount := 0
+	skipCount := 0
+	
+	for _, newPeer := range newPeers {
+		exists := false
+		for _, existingPeer := range a.conf.PeerList {
+			if existingPeer.Name == newPeer.Name {
+				exists = true
+				skipCount++
+				break
+			}
+		}
+		
+		if !exists {
+			a.conf.PeerList = append(a.conf.PeerList, newPeer)
+			successCount++
+		}
+	}
+	
+	return successCount, skipCount
 }
 func (a *App) Del(Name string) string {
 	for i, peer := range a.conf.PeerList {
