@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -14,7 +13,6 @@ import (
 	"github.com/sagernet/sing-box/option"
 	dns "github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing/common/json/badoption"
-	"github.com/sagernet/sing/service"
 )
 
 func getOUt(peer *config.Peer) option.Outbound {
@@ -115,12 +113,7 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 	httpOut.Tag = "http"
 	proxyOut.Tag = "proxy"
 	
-	// 创建带有端点注册表的 context
-	ctx := context.Background()
-	ctx = service.ContextWithDefaultRegistry(ctx)
-	
 	options := box.Options{
-		Context: ctx,
 		Options: option.Options{
 			Log: &option.LogOptions{
 				Disabled: true,
