@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/netip"
@@ -10,6 +11,7 @@ import (
 	"github.com/danbai225/gpp/backend/config"
 	"github.com/google/uuid"
 	box "github.com/sagernet/sing-box"
+	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 	dns "github.com/sagernet/sing-dns"
 	"github.com/sagernet/sing/common/json/badoption"
@@ -113,7 +115,12 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 	httpOut.Tag = "http"
 	proxyOut.Tag = "proxy"
 	
+	// 创建带有正确注册表的 context
+	ctx := context.Background()
+	ctx = include.Context(ctx)
+	
 	options := box.Options{
+		Context: ctx,
 		Options: option.Options{
 			Log: &option.LogOptions{
 				Disabled: true,
