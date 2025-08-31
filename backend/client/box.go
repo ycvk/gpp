@@ -127,7 +127,8 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 				RawDNSOptions: option.RawDNSOptions{
 					Servers: []option.DNSServerOptions{
 						{
-							Tag: "proxyDns",
+							Type: "legacy",
+							Tag:  "proxyDns",
 							Options: &option.LegacyDNSServerOptions{
 								Address:  proxyDNS,
 								Detour:   "proxy",
@@ -135,7 +136,8 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 							},
 						},
 						{
-							Tag: "localDns",
+							Type: "legacy",
+							Tag:  "localDns",
 							Options: &option.LegacyDNSServerOptions{
 								Address:  localDNS,
 								Detour:   "direct",
@@ -143,7 +145,8 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 							},
 						},
 						{
-							Tag: "block",
+							Type: "legacy",
+							Tag:  "block",
 							Options: &option.LegacyDNSServerOptions{
 								Address:  "rcode://success",
 								Strategy: option.DomainStrategy(dns.DomainStrategyUseIPv4),
