@@ -8,7 +8,7 @@ import Icons from 'unplugin-icons/vite'
 import IconsResolver from 'unplugin-icons/resolver'
 
 export default defineConfig({
-  base: './',
+  base: "./",  // 使用相对路径
   plugins: [
     vue(),
     AutoImport({
@@ -64,57 +64,10 @@ export default defineConfig({
     // Rollup配置
     rollupOptions: {
       output: {
-        // 手动代码分割策略
-        manualChunks(id) {
-          // 第三方库分组
-          if (id.includes('node_modules')) {
-            // Vue生态系统
-            if (id.includes('vue')) {
-              return 'vue-vendor'
-            }
-            // Naive UI
-            if (id.includes('naive-ui')) {
-              return 'naive-ui'
-            }
-            // 其他工具库
-            return 'vendor'
-          }
-          
-          // 业务代码分组
-          if (id.includes('/src/composables/')) {
-            return 'composables'
-          }
-          
-          if (id.includes('/src/components/business/')) {
-            return 'business-components'
-          }
-          
-          if (id.includes('/src/components/layout/')) {
-            return 'layout-components'
-          }
-          
-          if (id.includes('/src/views/Settings')) {
-            return 'settings'
-          }
-        },
-        
-        // 优化文件命名
-        chunkFileNames: 'js/[name]-[hash].js',
-        entryFileNames: 'js/[name]-[hash].js',
-        assetFileNames: (assetInfo) => {
-          const info = assetInfo.name!.split('.')
-          const ext = info[info.length - 1]
-          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
-            return `img/[name]-[hash].[ext]`
-          }
-          if (ext === 'css') {
-            return `css/[name]-[hash].[ext]`
-          }
-          if (/woff|woff2|eot|ttf|otf/i.test(ext)) {
-            return `fonts/[name]-[hash].[ext]`
-          }
-          return `assets/[name]-[hash].[ext]`
-        }
+        // 简化输出路径
+        entryFileNames: 'assets/[name].js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]'
       }
     },
     

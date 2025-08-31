@@ -80,6 +80,6 @@
   --transition-slow: 300ms ease;
   
   /* 应用尺寸约束 */
-  --app-width: 360px;
-  --app-height: 520px;
+  --app-width: 100vw;
+  --app-height: 100vh;
 }

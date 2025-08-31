@@ -1,6 +1,6 @@
 module github.com/danbai225/gpp
 
-go 1.24.0
+go 1.25
 
 require (
 	github.com/cloverstd/tcping v0.1.1

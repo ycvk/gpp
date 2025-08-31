@@ -28,7 +28,7 @@ const theme = computed(() => {
 <style>
 #app {
   height: 100vh;
-  width: 360px;
+  /* width removed - controlled by globals.css using var(--app-width) */
   overflow: hidden;
   position: relative;
 }
