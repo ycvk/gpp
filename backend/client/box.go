@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/netip"
 	"os"
 	"time"
@@ -106,7 +105,6 @@ func getOUt(peer *config.Peer) option.Outbound {
 	return out
 }
 func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []option.Rule) (*box.Box, error) {
-	home, _ := os.UserHomeDir()
 	proxyOut := getOUt(gamePeer)
 	httpOut := proxyOut
 	if httpPeer != nil {
@@ -169,28 +167,20 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 								},
 							},
 						},
+						// Route Chinese domains to local DNS
 						{
 							Type: "default",
 							DefaultOptions: option.DefaultDNSRule{
 								RawDefaultDNSRule: option.RawDefaultDNSRule{
-									Geosite: badoption.Listable[string]{"cn"},
+									DomainSuffix: badoption.Listable[string]{
+										".cn",
+										".xn--fiqs8s", // .中国
+										".xn--fiqz9s", // .中國
+									},
 								},
 								DNSRuleAction: option.DNSRuleAction{
 									RouteOptions: option.DNSRouteActionOptions{
 										Server: "localDns",
-									},
-								},
-							},
-						},
-						{
-							Type: "default",
-							DefaultOptions: option.DefaultDNSRule{
-								RawDefaultDNSRule: option.RawDefaultDNSRule{
-									Geosite: badoption.Listable[string]{"geolocation-!cn"},
-								},
-								DNSRuleAction: option.DNSRuleAction{
-									RouteOptions: option.DNSRouteActionOptions{
-										Server: "proxyDns",
 									},
 								},
 							},
@@ -236,16 +226,6 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 			},
 			Route: &option.RouteOptions{
 				AutoDetectInterface: true,
-				GeoIP: &option.GeoIPOptions{
-					Path:           fmt.Sprintf("%s%c%s%c%s", home, os.PathSeparator, ".gpp", os.PathSeparator, "geoip.db"),
-					DownloadURL:    "https://github.com/SagerNet/sing-geoip/releases/latest/download/geoip.db",
-					DownloadDetour: "http",
-				},
-				Geosite: &option.GeositeOptions{
-					Path:           fmt.Sprintf("%s%c%s%c%s", home, os.PathSeparator, ".gpp", os.PathSeparator, "geosite.db"),
-					DownloadURL:    "https://github.com/SagerNet/sing-geosite/releases/latest/download/geosite.db",
-					DownloadDetour: "http",
-				},
 				Rules: []option.Rule{
 					{
 						Type: "default",
@@ -312,7 +292,18 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
 				RawDefaultRule: option.RawDefaultRule{
-					Geosite: badoption.Listable[string]{"cn"},
+					DomainSuffix: badoption.Listable[string]{
+						".cn",
+						".xn--fiqs8s", // .中国
+						".xn--fiqz9s", // .中國
+						".qq.com",
+						".baidu.com",
+						".alibaba.com",
+						".taobao.com",
+						".jd.com",
+						".weibo.com",
+						".bilibili.com",
+					},
 				},
 				RuleAction: option.RuleAction{
 					RouteOptions: option.RouteActionOptions{
@@ -325,7 +316,15 @@ func Client(gamePeer, httpPeer *config.Peer, proxyDNS, localDNS string, rules []
 			Type: "default",
 			DefaultOptions: option.DefaultRule{
 				RawDefaultRule: option.RawDefaultRule{
-					GeoIP: badoption.Listable[string]{"cn", "private"},
+					IPCIDR: badoption.Listable[string]{
+						"192.168.0.0/16",
+						"10.0.0.0/8",
+						"172.16.0.0/12",
+						"127.0.0.0/8",
+						"::1/128",
+						"fc00::/7",
+						"fe80::/10",
+					},
 				},
 				RuleAction: option.RuleAction{
 					RouteOptions: option.RouteActionOptions{
